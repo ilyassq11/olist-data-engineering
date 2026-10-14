@@ -1,0 +1,18 @@
+controllo,problemi,esito
+Duplicati customer_id,0,PASS
+Duplicati order_id,0,PASS
+Duplicati product_id,0,PASS
+Duplicati seller_id,0,PASS
+Duplicati chiave order_items,0,PASS
+Duplicati chiave order_payments,0,PASS
+Duplicati chiave order_reviews,0,PASS
+Ordini senza cliente,0,PASS
+Articoli senza prodotto,0,PASS
+Articoli senza venditore,0,PASS
+Pagamenti senza ordine,0,PASS
+Recensioni senza ordine,0,PASS
+Recensioni fuori dall'intervallo 1-5,0,PASS
+Prezzi negativi,0,PASS
+Spese di spedizione negative,0,PASS
+Valori pagamento negativi,0,PASS
+Ordini senza identificativo cliente,0,PASS
