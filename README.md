@@ -27,6 +27,16 @@ The project demonstrates how to ingest raw CSV files, transform and load data in
 5. **SQL analysis:** Analyze orders, payments, reviews, and delivery performance.
 6. **Dashboard:** Explore business KPIs and findings through interactive visualizations.
 
+## Dashboard Preview
+
+### Main Dashboard
+
+![Main Dashboard](screenshots/dashboard-overview.png)
+
+### Delivery Performance Analysis
+
+![Delivery Analysis](screenshots/delivery-analysis.png)
+
 ## Key Findings
 
 The delivery analysis identified the following patterns among delivered orders with available delivery dates:
