@@ -1,4 +1,4 @@
-
+import sys
 import os
 from pathlib import Path
 
@@ -238,6 +238,7 @@ try:
 
     if failed:
         print("\nATTENZIONE: alcuni controlli richiedono un'indagine.")
+        sys.exit(1)
     else:
         print("\nTUTTI I CONTROLLI SONO STATI SUPERATI!")
 

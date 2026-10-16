@@ -138,3 +138,33 @@ The project includes SQL analysis for:
 Brazilian E-Commerce Public Dataset by Olist, available on Kaggle.
 
 This project is for educational and portfolio purposes.
+
+## Data Quality Testing
+
+The project includes automated data quality checks for duplicate identifiers, referential integrity, invalid review scores, and negative financial values.
+
+### Run data quality checks
+
+```bash
+python 06_data_quality.py
+```
+
+The script executes 17 checks against the PostgreSQL database and generates `data_quality_report.csv`.
+
+### Run automated tests
+
+Install the project dependencies:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Run the test suite:
+
+```bash
+python -m pytest -v
+```
+
+The test verifies that all data quality checks pass and that the report is generated correctly.
+
+**Note:** PostgreSQL must be running, the database must be populated, and the local `.env` file must contain the correct connection settings.
