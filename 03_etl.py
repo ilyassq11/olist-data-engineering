@@ -1,20 +1,15 @@
-
 import os
 from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL
 
 
-# Percorso principale del progetto
 BASE_DIR = Path(__file__).resolve().parent
-
-# Legge le credenziali dal file .env
 load_dotenv(BASE_DIR / ".env")
 
-# Crea la connessione a PostgreSQL
 connection_url = URL.create(
     "postgresql+psycopg2",
     username=os.environ["DB_USER"],
@@ -26,7 +21,6 @@ connection_url = URL.create(
 
 engine = create_engine(connection_url)
 
-# Dataset da caricare, nell'ordine corretto
 tables = [
     "sellers",
     "products",
@@ -38,7 +32,19 @@ tables = [
     "order_reviews",
 ]
 
-# Colonne che contengono date
+# Tutte le tabelle referenziate o referenzianti da svuotare
+# vengono incluse nella stessa istruzione TRUNCATE.
+tables_to_refresh = [
+    "order_reviews",
+    "order_payments",
+    "order_items",
+    "orders",
+    "geolocation",
+    "category_translation",
+    "products",
+    "sellers",
+]
+
 date_columns = {
     "orders": [
         "order_purchase_timestamp",
@@ -54,37 +60,134 @@ date_columns = {
     ],
 }
 
-# Caricamento dei dataset
-for table in tables:
-    file_path = BASE_DIR / "data" / f"olist_{table}_dataset.csv"
 
-    # Il file della traduzione ha un nome diverso
+def get_file_path(table):
     if table == "category_translation":
-        file_path = BASE_DIR / "data" / "product_category_name_translation.csv"
+        return BASE_DIR / "data" / "product_category_name_translation.csv"
 
-    print(f"\nCaricamento: {table}")
+    return BASE_DIR / "data" / f"olist_{table}_dataset.csv"
 
-    df = pd.read_csv(file_path)
 
-    # Converte le date prima dell'inserimento
-    for column in date_columns.get(table, []):
-        df[column] = pd.to_datetime(df[column], errors="coerce")
-
-    # La tabella geolocation ha una chiave creata dal progetto
-    if table == "geolocation":
-        df.insert(0, "geolocation_id", range(1, len(df) + 1))
-
-    print(f"Righe lette: {len(df)}")
-
-    df.to_sql(
-        name=table,
-        con=engine,
-        if_exists="append",
-        index=False,
-        chunksize=5000,
+def get_db_columns(conn, table):
+    result = conn.execute(
+        text("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = :table
+            ORDER BY ordinal_position
+        """),
+        {"table": table},
     )
+    return [row[0] for row in result]
 
-    print(f"Completato: {table}")
 
-print("\nETL terminato!")
-engine.dispose()
+def main():
+    expected_rows = {}
+    file_paths = {}
+
+    try:
+        # 1. Controlli preliminari: file, intestazioni e conteggi.
+        with engine.connect() as conn:
+            for table in tables:
+                path = get_file_path(table)
+                file_paths[table] = path
+
+                if not path.is_file():
+                    raise FileNotFoundError(f"File mancante: {path}")
+
+                csv_columns = pd.read_csv(path, nrows=0).columns.tolist()
+                db_columns = get_db_columns(conn, table)
+
+                # geolocation_id viene generato dall'ETL.
+                if table == "geolocation":
+                    db_columns = [
+                        col for col in db_columns
+                        if col != "geolocation_id"
+                    ]
+
+                if csv_columns != db_columns:
+                    raise ValueError(
+                        f"Colonne non corrispondenti per {table}.\n"
+                        f"CSV: {csv_columns}\n"
+                        f"DB:  {db_columns}"
+                    )
+
+                # Conta le righe a blocchi, senza caricare tutto
+                # il dataset in memoria.
+                expected_rows[table] = sum(
+                    len(chunk)
+                    for chunk in pd.read_csv(path, chunksize=50000)
+                )
+
+                print(
+                    f"Verificato {table}: "
+                    f"{expected_rows[table]} righe attese"
+                )
+
+        print("\nControlli preliminari completati.")
+
+        # 2. Refresh atomico: se qualcosa fallisce, rollback.
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "TRUNCATE TABLE "
+                    + ", ".join(tables_to_refresh)
+                    + " RESTART IDENTITY"
+                )
+            )
+
+            for table in tables:
+                print(f"\nCaricamento: {table}")
+
+                df = pd.read_csv(file_paths[table])
+
+                for column in date_columns.get(table, []):
+                    df[column] = pd.to_datetime(
+                        df[column],
+                        errors="coerce",
+                    )
+
+                if table == "geolocation":
+                    df.insert(
+                        0,
+                        "geolocation_id",
+                        range(1, len(df) + 1),
+                    )
+
+                df.to_sql(
+                    name=table,
+                    con=conn,
+                    if_exists="append",
+                    index=False,
+                    chunksize=5000,
+                )
+
+                actual_rows = conn.execute(
+                    text(f'SELECT COUNT(*) FROM "{table}"')
+                ).scalar_one()
+
+                if actual_rows != expected_rows[table]:
+                    raise ValueError(
+                        f"Conteggio errato per {table}: "
+                        f"attese {expected_rows[table]}, "
+                        f"trovate {actual_rows}"
+                    )
+
+                print(f"Completato: {actual_rows} righe")
+
+        print("\nETL completato: transazione confermata.")
+
+    except Exception:
+        print(
+            "\nETL fallito. Se l'errore è avvenuto durante "
+            "la transazione, PostgreSQL ha annullato il refresh."
+        )
+        raise
+
+    finally:
+        engine.dispose()
+
+
+if __name__ == "__main__":
+    main()
