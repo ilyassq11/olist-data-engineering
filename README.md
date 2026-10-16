@@ -2,78 +2,89 @@
 
 ## Overview
 
-This project analyzes the Brazilian E-Commerce Public Dataset by Olist using Python, Pandas, PostgreSQL, SQL, and Streamlit.
+An end-to-end data engineering and analytics project built using the Brazilian E-Commerce Public Dataset by Olist.
 
-The goal is to build a small end-to-end data pipeline, validate data quality, perform business analysis, and present key findings through an interactive dashboard.
+The project demonstrates how to ingest raw CSV files, transform and load data into PostgreSQL, validate data quality, analyze business performance with SQL, and communicate findings through an interactive Streamlit dashboard.
 
 ## Tech Stack
 
-* **Python** — ETL pipeline and automated data quality checks
-* **Pandas** — data ingestion and transformation
-* **PostgreSQL** — relational database and SQL analysis
-* **SQLAlchemy** — database connectivity
-* **Streamlit** — interactive dashboard
-* **Plotly** — data visualizations
-* **python-dotenv** — environment variable management
+- **Python** — ETL pipeline, data validation, and automation
+- **Pandas** — data ingestion and transformation
+- **PostgreSQL** — relational data storage and analysis
+- **SQLAlchemy & psycopg2** — database connectivity
+- **SQL** — business analysis and database views
+- **Streamlit** — interactive dashboard
+- **Plotly** — data visualizations
+- **python-dotenv** — environment configuration
+- **pytest** — automated testing
 
 ## Project Architecture
 
-1. **Data ingestion:** Load the source CSV files.
-2. **ETL pipeline:** Parse date columns and load data into PostgreSQL.
-3. **Data quality:** Run automated checks for duplicates, missing relationships, invalid review scores, and invalid numeric values.
-4. **SQL analysis:** Create views and analyze orders, payments, reviews, and delivery performance.
-5. **Dashboard:** Explore the results through interactive charts and KPIs.
+1. **Data ingestion:** Read the original Olist CSV files.
+2. **Database setup:** Create the PostgreSQL tables and relationships.
+3. **ETL pipeline:** Validate source files, transform date fields, load data in dependency order, and verify row counts.
+4. **Data quality:** Execute 17 SQL-based checks for duplicates, referential integrity, invalid values, and other data issues.
+5. **SQL analysis:** Analyze orders, payments, reviews, and delivery performance.
+6. **Dashboard:** Explore business KPIs and findings through interactive visualizations.
 
 ## Key Findings
 
-The analysis of delivered orders found that:
+The delivery analysis identified the following patterns among delivered orders with available delivery dates:
 
-* **8.11%** of delivered orders with available delivery dates arrived later than estimated.
-* Late deliveries were associated with an average review score of **2.57/5**, compared with **4.29/5** for orders delivered on time or early.
-* **54.03%** of reviews associated with late deliveries had a score of 1 or 2, compared with **9.23%** for on-time or early deliveries.
-* The automated data quality script completed **17 checks**, all passing.
+- **8.11%** arrived later than estimated.
+- Late-delivered orders had an average review score of **2.57/5**, compared with **4.29/5** for orders delivered on time or early.
+- **54.03%** of reviews associated with late deliveries scored 1 or 2, compared with **9.23%** for on-time or early deliveries.
+- All **17 data quality checks** passed during the reported validation run.
 
-These findings show an association between delivery delays and lower customer satisfaction. They do not establish that delays alone caused the lower scores.
+These results indicate a strong association between delivery delays and lower customer satisfaction. They do not establish causation.
 
 ## Project Structure
 
 ```text
 olist-data-engineering/
 ├── data/                       # Source CSV files (download separately)
+├── src/                        # Supporting analysis scripts
+├── tests/
+│   └── test_data_quality.py    # Automated data quality test
+├── 01_create_schema.sql        # Database schema
 ├── 03_etl.py                   # ETL pipeline
 ├── 04_sql_analysis.sql         # Business analysis queries
 ├── 05_dashboard.py             # Streamlit dashboard
-├── 06_data_quality.py          # Automated data quality checks
+├── 06_data_quality.py          # Data quality validation
 ├── 07_delivery_analysis.sql    # Delivery performance analysis
-├── data_quality_report.csv     # Generated quality check report
+├── data_quality_report.csv     # Generated quality report
 ├── requirements.txt            # Python dependencies
 ├── .gitignore
 └── README.md
 ```
 
-## Setup
+## Getting Started
+
+### Prerequisites
+
+- Python 3.10 or newer
+- PostgreSQL
+- The Olist dataset downloaded from Kaggle
 
 ### 1. Download the dataset
 
-Download the Brazilian E-Commerce Public Dataset by Olist from Kaggle:
+Download the [Brazilian E-Commerce Public Dataset by Olist on Kaggle](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce).
 
-https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce
+Create a `data/` directory in the project root and place the required CSV files inside it, preserving their original filenames.
 
-Place the required CSV files inside the project's `data/` directory, preserving their original filenames.
+The source CSV files are not included in this repository.
 
 ### 2. Install dependencies
 
-Python 3.10 or newer is recommended.
+Open a terminal in the project directory and run:
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 ### 3. Configure PostgreSQL
 
-Create a PostgreSQL database and configure the connection in a `.env` file in the project root.
-
-Example:
+Create a PostgreSQL database and configure the connection in a `.env` file in the project root:
 
 ```dotenv
 DB_HOST=localhost
@@ -83,88 +94,72 @@ DB_USER=postgres
 DB_PASSWORD=your_local_password
 ```
 
-Use your own local database credentials. Never commit the `.env` file.
+Replace the example password with your own local database password. Never commit `.env` or publish database credentials.
 
-Create the required tables and constraints in PostgreSQL before running the ETL pipeline.
+### 4. Create the database schema
 
-### 4. Run the ETL pipeline
+Execute `01_create_schema.sql` against your PostgreSQL database to create the required tables and constraints before running the ETL pipeline.
+
+You can execute the SQL file using a PostgreSQL client such as pgAdmin or `psql`.
+
+### 5. Run the ETL pipeline
 
 ```bash
 python 03_etl.py
 ```
 
-The script reads the CSV files, converts relevant date columns, and loads the data into PostgreSQL.
+The pipeline validates the source files, transforms relevant fields, and loads the data into PostgreSQL in the correct dependency order. It checks the expected row counts and uses a database transaction to protect against partial loads.
 
-**Note:** The current ETL script appends rows to existing tables. Prepare empty tables before the initial load, and do not rerun it against populated tables without resetting or adapting the load strategy.
+The ETL uses a **full-refresh strategy** for the tables it manages: existing data in those tables is replaced on a successful run. The `customers` table is not refreshed by this pipeline and must already be populated.
 
-### 5. Run data quality checks
+The pipeline includes structured logging and records execution duration. Check the generated `etl.log` file for execution details.
 
-```bash
-python 06_data_quality.py
-```
-
-The script runs automated checks and generates a data quality report.
-
-### 6. Launch the dashboard
-
-```bash
-python -m streamlit run 05_dashboard.py
-```
-
-Streamlit will provide a local URL where the dashboard can be viewed in a browser.
-
-## SQL Analysis
-
-The project includes SQL analysis for:
-
-* Order status and delivery KPIs
-* Monthly value of delivered order items
-* Payment methods
-* Customer review distribution
-* Late delivery rates and delays
-* Review scores by delivery performance
-
-## Future Improvements
-
-* Make the ETL pipeline idempotent and safe to rerun.
-* Add structured logging and error handling.
-* Automate pipeline execution.
-* Add tests for transformation logic.
-* Containerize the application with Docker.
-* Deploy the dashboard.
-
-## Data Source
-
-Brazilian E-Commerce Public Dataset by Olist, available on Kaggle.
-
-This project is for educational and portfolio purposes.
-
-## Data Quality Testing
-
-The project includes automated data quality checks for duplicate identifiers, referential integrity, invalid review scores, and negative financial values.
-
-### Run data quality checks
+### 6. Run data quality checks
 
 ```bash
 python 06_data_quality.py
 ```
 
-The script executes 17 checks against the PostgreSQL database and generates `data_quality_report.csv`.
+This executes 17 checks against PostgreSQL and generates `data_quality_report.csv`. The script exits with a failure status if any check fails.
 
-### Run automated tests
-
-Install the project dependencies:
-
-```bash
-python -m pip install -r requirements.txt
-```
-
-Run the test suite:
+### 7. Run automated tests
 
 ```bash
 python -m pytest -v
 ```
 
-The test verifies that all data quality checks pass and that the report is generated correctly.
+The test suite verifies that the data quality script completes successfully, produces the expected report, and passes all 17 checks.
 
-**Note:** PostgreSQL must be running, the database must be populated, and the local `.env` file must contain the correct connection settings.
+PostgreSQL must be running, the database must be populated, and `.env` must contain valid connection settings.
+
+### 8. Launch the dashboard
+
+```bash
+python -m streamlit run 05_dashboard.py
+```
+
+Open the local URL displayed in the terminal to explore the dashboard.
+
+## SQL Analysis
+
+The project includes SQL queries and views covering:
+
+- Order status and delivery KPIs
+- Monthly value of delivered order items
+- Payment method distribution
+- Customer review distribution
+- Late-delivery rates and delays
+- Review scores by delivery performance
+
+## Future Improvements
+
+- Add tests for individual transformation functions.
+- Automate ETL execution and scheduling.
+- Containerize the application with Docker.
+- Deploy the dashboard for public access.
+
+## Data Source and Disclaimer
+
+Dataset: [Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce).
+
+This project is intended for educational purposes and as a data engineering portfolio project.
