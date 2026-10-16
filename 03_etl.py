@@ -1,4 +1,6 @@
+import logging
 import os
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -9,6 +11,17 @@ from sqlalchemy.engine import URL
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(BASE_DIR / "etl.log", encoding="utf-8"),
+    ],
+)
+
+logger = logging.getLogger(__name__)
 
 connection_url = URL.create(
     "postgresql+psycopg2",
@@ -83,6 +96,8 @@ def get_db_columns(conn, table):
 
 
 def main():
+    start_time = time.perf_counter()
+    logger.info("Avvio ETL.")
     expected_rows = {}
     file_paths = {}
 
@@ -120,12 +135,14 @@ def main():
                     for chunk in pd.read_csv(path, chunksize=50000)
                 )
 
-                print(
-                    f"Verificato {table}: "
-                    f"{expected_rows[table]} righe attese"
+                logger.info(
+                    "Verificato %s: %s righe attese",
+                    table,
+                    expected_rows[table],
                 )
 
-        print("\nControlli preliminari completati.")
+        logger.info("Controlli preliminari completati.")
+        
 
         # 2. Refresh atomico: se qualcosa fallisce, rollback.
         with engine.begin() as conn:
@@ -138,7 +155,7 @@ def main():
             )
 
             for table in tables:
-                print(f"\nCaricamento: {table}")
+                logger.info("Caricamento tabella: %s", table)
 
                 df = pd.read_csv(file_paths[table])
 
@@ -174,14 +191,21 @@ def main():
                         f"trovate {actual_rows}"
                     )
 
-                print(f"Completato: {actual_rows} righe")
+                logger.info(
+                    "Caricamento completato: %s, %s righe",
+                    table,
+                    actual_rows,
+                )
 
-        print("\nETL completato: transazione confermata.")
+        logger.info("ETL completato: transazione confermata.")
+        
+        elapsed = time.perf_counter() - start_time
+        logger.info("Durata totale ETL: %.2f secondi", elapsed)
 
     except Exception:
-        print(
-            "\nETL fallito. Se l'errore è avvenuto durante "
-            "la transazione, PostgreSQL ha annullato il refresh."
+        logger.exception(
+        "ETL fallito. Se l'errore è avvenuto durante "
+        "la transazione, PostgreSQL ha annullato il refresh."
         )
         raise
 
@@ -191,3 +215,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
