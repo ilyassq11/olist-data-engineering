@@ -92,6 +92,7 @@ def test_detects_duplicate_customer_in_ci_database():
         assert duplicate_check.iloc[0]["problemi"] > 0
         assert duplicate_check.iloc[0]["esito"] == "FAIL"
 
+    
     finally:
         with engine.begin() as connection:
             connection.execute(
@@ -102,3 +103,12 @@ def test_detects_duplicate_customer_in_ci_database():
                 )
             )
         engine.dispose()
+
+        # Rigenera il report dopo aver ripristinato i dati puliti.
+        cleanup_result = run_quality_script()
+        assert cleanup_result.returncode == 0, (
+            "Il report non è stato ripristinato dopo il test negativo.\n"
+            f"Output:\n{cleanup_result.stdout}\n"
+            f"Errori:\n{cleanup_result.stderr}"
+        )
+
