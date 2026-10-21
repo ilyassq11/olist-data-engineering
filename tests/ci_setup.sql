@@ -53,3 +53,4 @@ VALUES ('order_1', 1, 30.00);
 
 INSERT INTO order_reviews
 VALUES ('review_1', 'order_1', 5);
+
