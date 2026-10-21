@@ -1,4 +1,3 @@
-
 name: Data Quality Tests
 
 on:
@@ -10,6 +9,28 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: olist_test
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: olist_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U olist_test -d olist_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_USER: olist_test
+      DB_PASSWORD: test_password
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: olist_test
 
     steps:
       - name: Checkout repository
@@ -24,6 +45,11 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt pytest
+
+      - name: Create test database tables
+        run: psql -h localhost -U olist_test -d olist_test -f tests/ci_setup.sql
+        env:
+          PGPASSWORD: test_password
 
       - name: Run data quality tests
         run: python -m pytest -v
